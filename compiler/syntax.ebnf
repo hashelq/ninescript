@@ -1,5 +1,5 @@
 path        ; "import" (src ("/")? )+                     ;
-version     ; "//@version" "=" number                     ;
+version     ; "//" "@" "version" "=" number               ;
 import      ; path                                        ;
 let         ; literal "=" expr                            ;
 fn-call     ; ident "(" (expr),* ")"                      ;
