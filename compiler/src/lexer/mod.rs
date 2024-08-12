@@ -25,7 +25,7 @@ impl Iterator for Lexer {
     type Item = Result<Token, LexerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut c = self.source_stream.get(self.position);
+        let c = self.source_stream.get(self.position);
         self.position += 1;
 
         /* In case stream is ended */
