@@ -1,0 +1,10 @@
+path        ; "import" (src ("/")? )+                     ;
+version     ; "//@version" "=" number                     ;
+import      ; path                                        ;
+let         ; literal "=" expr                            ;
+fn-call     ; ident "(" (expr),* ")"                      ;
+fn-def      ; ident "(" (expr),* ")" "=>" (\n expr)*      ;
+color-hex3  ; "#" ([0-9a-fA-F]{3})                        ;
+color-hex4  ; "#" ([0-9a-fA-F]{4})                        ;
+if          ; "if" expr "\n" expr (else "\n" expr)?;      ;
+for-next    ; "for" ident "=" expr "to" expr ("\n" expr)+ ;
