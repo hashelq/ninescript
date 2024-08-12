@@ -1,0 +1,7 @@
+[package]
+name = "ninescript-compiler"
+description = "A LLVM-backed compiler for ninescript."
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
