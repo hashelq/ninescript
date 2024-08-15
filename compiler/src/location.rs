@@ -16,19 +16,16 @@ impl Location {
     pub fn visualize<'a>(
         &self,
         line: &'a str,
-        desc: impl fmt::Display + 'a,
     ) -> impl fmt::Display + 'a {
-        struct Visualize<'a, D: fmt::Display> {
+        struct Visualize<'a> {
             loc: Location,
             line: &'a str,
-            desc: D,
         }
-        impl<D: fmt::Display> fmt::Display for Visualize<'_, D> {
+        impl fmt::Display for Visualize<'_> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 write!(
                     f,
-                    "{}\n{}{arrow:>pad$}",
-                    self.desc,
+                    "{}\n{arrow:>pad$}",
                     self.line,
                     pad = self.loc.column,
                     arrow = "^",
@@ -38,7 +35,6 @@ impl Location {
         Visualize {
             loc: *self,
             line,
-            desc,
         }
     }
 }

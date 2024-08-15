@@ -130,6 +130,15 @@ HighLevelExpression: Box<Expr> = {
   <Expr> StatementEnd
 };
 
+TypeProperty: (String, String) = {
+  <identifier> <identifier>
+};
+
+EnumVariant: (String, Option<String>) = {
+  <x:identifier> "=" <y:string> => (x, Some(y)),
+  <x:identifier> => (x, None),
+};
+
 StatementInner: Statement = {
     /* import A/B/7 */
     "import" <args:Path<ImportPart>> "\n" => Statement::Import(args.join("/")),
@@ -143,11 +152,23 @@ StatementInner: Statement = {
     /* [a, b, c] = d */
     "#unpack_tuple" "[" <e:Comma<identifier>> "]" "=" <v:HighLevelExpression> => Statement::UnpackTuple(e, v),
 
+    /* type x \n (a b)+ */
+    "type" <name:identifier> "\n" Indent <props:Lines<TypeProperty>> Dedent => Statement::TypeDef(name, props),
+
+    /* enum x \n (a b)+ */
+    "enum" <name:identifier> "\n" Indent <variants:Lines<EnumVariant>> Dedent => Statement::EnumDef(name, variants),
+
     /* x = 2 */
     <var:VarPart> "=" <v:HighLevelExpression> => Statement::VarLet(var, v),
 
     /* var x = 2 */
     "var" <var:VarPart> "=" <v:HighLevelExpression> => Statement::VarDef(var, v),
+
+    /* const x = 2 */
+    "const" <var:VarPart> "=" <v:HighLevelExpression> => Statement::ConstDef(var, v),
+
+    /* series x = 2 */
+    "series" <var:VarPart> "=" <v:HighLevelExpression> => Statement::SeriesDef(var, v),
     
     /* x := 2 */
     <k:identifier> ":=" <v:HighLevelExpression> => Statement::VarAssign(k, v),
@@ -276,6 +297,10 @@ extern {
     "while" => Tok::While,
     "switch" => Tok::Switch,
     "var" => Tok::Var,
+    "const" => Tok::Const,
+    "type" => Tok::Type,
+    "enum" => Tok::Enum,
+    "series" => Tok::Series,
     "import" => Tok::Import,
     "not" => Tok::Not,
     "and" => Tok::And,

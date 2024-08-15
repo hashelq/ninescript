@@ -13,17 +13,16 @@ pub struct Lexer {
     indention_now: usize,
     dedent_required: isize,
     prev_new_line: bool,
-    started: bool,
     new_line: bool
 }
 
 impl Lexer {
     pub fn new(src: &str, indention_level: usize) -> Self {
-        let src = Regex::new(r"([_a-zA-Z]+[_a-zA-Z0-9]*)\(.*\) =>").unwrap().replace_all(src, "\0function $0");
+        let src = Regex::new(r"^([_a-zA-Z]+[_a-zA-Z0-9]*)(<.*>)?\(.*\) =>").unwrap().replace_all(src, "\0function $0");
         let src = Regex::new(r"\[([_a-zA-Z]+[_a-zA-Z0-9]*)(,\s*[_a-zA-Z]+[_a-zA-Z0-9]*)*\]\s*=").unwrap().replace_all(&src, "\0unpack_tuple $0");
         let src = src.replace("\t", &String::from(" ").repeat(indention_level));
         let chars = src.chars().collect();
-        Self { started: false, chars, position: 0, location: Location::new(1, 1), indention_level, new_line: true, indention_now: 0, dedent_required: 0, prev_new_line: true }
+        Self { chars, position: 0, location: Location::new(1, 1), indention_level, new_line: true, indention_now: 0, dedent_required: 0, prev_new_line: true }
     }
 
     fn has_more_tokens(&self) -> bool {
@@ -58,6 +57,10 @@ impl Lexer {
         Some(match id {
             "if" => Tok::If,
             "else" => Tok::Else,
+            "series" => Tok::Series,
+            "const" => Tok::Const,
+            "type" => Tok::Type,
+            "enum" => Tok::Enum,
             "var" => Tok::Var,
             "for" => Tok::For,
             "to" => Tok::To,
@@ -87,11 +90,6 @@ impl Lexer {
     }
 
     fn inner_next(&mut self) -> Result<Spanned, LexicalError> {
-        //if !self.started {
-        //    self.started = true;
-        //    return Ok((self.location, Tok::StartOfFile, self.location));
-        //}
-
         if !self.has_more_tokens() {
             return Ok(self.make_eof());
         };
@@ -210,7 +208,7 @@ impl Lexer {
             return Ok((loc_left, t, self.location));
         }
 
-        // strings:
+        // strings ("):
         if char == '"' {
             let mut stack = String::new();
             let mut prev_was_backslash = false;
@@ -227,6 +225,33 @@ impl Lexer {
                     prev_was_backslash = true;
                     continue;
                 } else if char == '"' {
+                    break;
+                }
+
+                stack.push(char);
+            };
+
+            // FIXME: bounds
+            return Ok((loc_left, Tok::String { value: stack }, self.location));
+        }
+
+        // strings ('):
+        if char == '\'' {
+            let mut stack = String::new();
+            let mut prev_was_backslash = false;
+            
+            loop {
+                char = match self.set_next_char() {
+                    Some(v) => v,
+                    None => break
+                };
+
+                if prev_was_backslash {
+                    prev_was_backslash = false;
+                } else if char == '\\' {
+                    prev_was_backslash = true;
+                    continue;
+                } else if char == '\'' {
                     break;
                 }
 

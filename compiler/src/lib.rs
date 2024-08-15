@@ -1,4 +1,4 @@
-use lalrpop_util::lalrpop_mod;
+use lalrpop_util::{lalrpop_mod, ParseError};
 use lexer::Lexer;
 use token::Tok;
 
@@ -13,15 +13,26 @@ lalrpop_mod!(ninescript);
 #[test]
 fn calculator1() {
     let src = r#"
-test = 123
-if x == 3
-    b = 8
-
+enum X
+    SMA = "SMA"
+    EMA = "EMA"
 "#.trim_start();
     let tokens = Lexer::new(src, 4).collect::<Vec<_>>();
     let tokens = tokens.into_iter().map(|x| x.unwrap()).collect::<Vec<_>>();
-    //let loc = tokens.last().unwrap().0;
-    //tokens.push((loc, Tok::EndOfFile, loc));
-    println!("{:#?}", tokens.iter().map(|x| &x.1).collect::<Vec<_>>());
-    println!("{:#?}", ninescript::StatementsParser::new().parse(tokens));
+    let result = ninescript::StatementsParser::new().parse(tokens);
+    println!("{:?}", result);
+    let result = match result {
+        Ok(x) => x,
+        Err(e) => {
+            let mut y = false;
+            e.map_location(|x| {
+                if y == true {return;}
+                y = true;
+                let vis = x.visualize(src.split('\n').nth(x.row()-1).unwrap_or(""));
+                println!("\n\nError at {}:{}\n{}\n\n", x.row(), x.column(), vis);
+            });
+            return;
+        }
+    };
+    println!("{:#?}", result);
 }

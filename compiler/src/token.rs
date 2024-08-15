@@ -48,6 +48,10 @@ pub enum Tok {
     Switch,
     Import,
     Var,
+    Const,
+    Type,
+    Enum,
+    Series,
     True,
     False,
 

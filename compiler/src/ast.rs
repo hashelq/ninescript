@@ -13,6 +13,10 @@ pub struct VarParam(pub VarType, pub VarName, pub Option<Box<Expr>>);
 pub enum Statement {
     Import(String),
     UnpackTuple(Vec<VarName>, Box<Expr>),
+    ConstDef(Var, Box<Expr>),
+    SeriesDef(Var, Box<Expr>),
+    TypeDef(String, Vec<(String, String)>),
+    EnumDef(String, Vec<(String, Option<String>)>),
     VarDef(Var, Box<Expr>),
     VarLet(Var, Box<Expr>),
     VarAssign(VarName, Box<Expr>),
