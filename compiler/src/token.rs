@@ -63,6 +63,7 @@ pub enum Tok {
     Minus,
     Asterisk,
     Slash,
+    Mod,
     At,
     Hash,
     OpenParenthesis,

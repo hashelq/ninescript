@@ -42,14 +42,20 @@ ExprOp: Opcode = {
   ":" => Opcode::TernaryElse,
 }; 
 
-BoolOp: Opcode = {
+BoolAndOp: Opcode = {
     "and" => Opcode::And,
+}
+
+BoolOrOp: Opcode = {
     "or" => Opcode::Or,
 }
 
 CompOp: Opcode = {
     "==" => Opcode::Equal,
     "!=" => Opcode::NotEqual,
+};
+
+Comp2Op: Opcode = {
     ">" => Opcode::Greater,
     "<" => Opcode::Less,
     ">=" => Opcode::Gte,
@@ -63,6 +69,7 @@ AdditiveOp: Opcode = {
 
 
 FactorOp: Opcode = { 
+    "%" => Opcode::Mod,
     "*" => Opcode::Mul,
     "/" => Opcode::Div,
 };
@@ -72,14 +79,17 @@ Tier<Op,NextTier>: Box<Expr> = {
     NextTier,
 };
 
-Expr = Tier<ExprOp, BoolL>;
-BoolL = Tier<BoolOp, Comp>;
-Comp = Tier<CompOp, Additive>;
+Expr = Tier<ExprOp, BoolLOr>;
+BoolLOr = Tier<BoolOrOp, BoolLAnd>;
+BoolLAnd = Tier<BoolAndOp, Comp>;
+Comp = Tier<CompOp, Comp2>;
+Comp2 = Tier<Comp2Op, Additive>;
 Additive = Tier<AdditiveOp, Factor>;
 Factor = Tier<FactorOp, Rev>;
 Rev: Box<Expr> = {
   "not" <t:Term> => Box::new(Expr::Not(t)),
   "-" <t:Term> => Box::new(Expr::Negative(t)),
+  "+" <t:Term> => t,
   Term
 };
 
@@ -258,6 +268,7 @@ extern {
     "-" => Tok::Minus,
     "/" => Tok::Slash,
     "*" => Tok::Asterisk,
+    "%" => Tok::Mod,
     "\\" => Tok::Backslash,
     "@" => Tok::At,
     "#" => Tok::Hash,

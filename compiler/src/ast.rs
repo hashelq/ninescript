@@ -65,6 +65,7 @@ pub enum Opcode {
     Div,
     Add,
     Sub,
+    Mod
 }
 
 #[derive(Debug)]

@@ -174,9 +174,12 @@ impl Lexer {
         }
 
         // ints and floats:
-        if char.is_numeric() {
+        if char.is_numeric() || char == '.' {
             let mut is_float = false;
             let mut stack = String::new();
+            if char == '.' {
+                is_float = true;
+            }
             stack.push(char);
             
             loop {
@@ -421,6 +424,7 @@ impl Lexer {
             '#' => Tok::Hash,
             '.' => Tok::Dot,
             ',' => Tok::Comma,
+            '%' => Tok::Mod,
             ':' => {
                 let mut t = Tok::Colon;
                     if let Some('=') = self.set_next_char() {

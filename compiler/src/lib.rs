@@ -13,9 +13,9 @@ lalrpop_mod!(ninescript);
 #[test]
 fn calculator1() {
     let src = r#"
-enum X
-    SMA = "SMA"
-    EMA = "EMA"
+
+x = x > 2 == x < 3
+
 "#.trim_start();
     let tokens = Lexer::new(src, 4).collect::<Vec<_>>();
     let tokens = tokens.into_iter().map(|x| x.unwrap()).collect::<Vec<_>>();
