@@ -1,0 +1,294 @@
+use std::str::FromStr;
+use crate::ast::{Expr, Opcode, Statement, Var, VarParam, VarName};
+use crate::lexer::Lexer;
+use crate::error::LexicalError;
+use crate::location::Location;
+use crate::token::Tok;
+use crate::types::RGBA;
+
+grammar;
+
+pub Statements = CodeBlock<StatementInner>;
+pub Exprs: Vec<Box<Expr>> = {
+  <c:Comma<Expr>> "\n"? => c
+};
+
+List<T, C>: Vec<T> = {
+    <mut v:(<T> C)*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+Comma<T> = List<T, ",">;
+Path<T> = List<T, "/">;
+Lines<T> = List<T, "\n">;
+
+CodeBlock<T>: Vec<T> = {
+    <mut v:(<T>)*> => v
+};
+
+StatementsBlock: Vec<Statement> = {
+  Indent <st:Statements> "\n" Dedent => st,
+  Indent <st:Statements> Dedent => st,
+  Indent <st:Statements> EOF => st,
+};
+
+ExprOp: Opcode = {
+  "?" => Opcode::TernaryIf,
+  ":" => Opcode::TernaryElse,
+}; 
+
+BoolOp: Opcode = {
+    "and" => Opcode::And,
+    "or" => Opcode::Or,
+}
+
+CompOp: Opcode = {
+    "==" => Opcode::Equal,
+    "!=" => Opcode::NotEqual,
+    ">" => Opcode::Greater,
+    "<" => Opcode::Less,
+    ">=" => Opcode::Gte,
+    "<=" => Opcode::Lte,
+};
+
+AdditiveOp: Opcode = { 
+    "+" => Opcode::Add,
+    "-" => Opcode::Sub,
+};
+
+
+FactorOp: Opcode = { 
+    "*" => Opcode::Mul,
+    "/" => Opcode::Div,
+};
+
+Tier<Op,NextTier>: Box<Expr> = {
+    Tier<Op,NextTier> Op NextTier => Box::new(Expr::Op(<>)),
+    NextTier,
+};
+
+Expr = Tier<ExprOp, BoolL>;
+BoolL = Tier<BoolOp, Comp>;
+Comp = Tier<CompOp, Additive>;
+Additive = Tier<AdditiveOp, Factor>;
+Factor = Tier<FactorOp, Rev>;
+Rev: Box<Expr> = {
+  "not" <t:Term> => Box::new(Expr::Not(t)),
+  "-" <t:Term> => Box::new(Expr::Negative(t)),
+  Term
+};
+
+StatementEnd = {
+  "\n",
+  EOF
+};
+
+ImportPart: String = {
+  identifier => <>,
+  int => <>.to_string()
+};
+
+VarPart: Var = {
+  <t:identifier?> <k:identifier> => Var(t, k)
+};
+
+FunctionParam: VarParam = {
+  <t:identifier?> <k:identifier> => VarParam(t, k, None),
+  <t:identifier?> <k:identifier> "=" <dv:Expr> => VarParam(t, k, Some(dv)),
+};
+
+IfBody: (Box<Expr>, Vec<Statement>) = {
+    <condition:Expr> "\n" <do_if:StatementsBlock> => (condition, do_if),
+};
+
+ElseBody: Vec<Statement> = {
+    "\n" <do_else:StatementsBlock> => do_else,
+    <elseif:IfExpression> => vec![Statement::Expression(Box::new(elseif))]
+};
+
+IfExpression: Expr = {
+    "if" <b:IfBody> => Expr::If(b.0, b.1, None),
+    "if" <b:IfBody> "else" <e:ElseBody> => Expr::If(b.0, b.1, Some(e)),
+};
+
+SwitchVariant: (Option<Box<Expr>>, Box<Statement>) = {
+  <left:Expr?> "=>" <right:StatementInner> => (left, Box::new(right))
+};
+
+SwitchExpression: Expr = {
+  "switch" <subject:Expr?> "\n" Indent <variants:CodeBlock<SwitchVariant>> Dedent => Expr::Switch(subject, variants),
+};
+
+HighLevelExpression: Box<Expr> = {
+  <x:IfExpression> => Box::new(x),
+  <x:SwitchExpression> => Box::new(x),
+  <Expr> StatementEnd
+};
+
+StatementInner: Statement = {
+    /* import A/B/7 */
+    "import" <args:Path<ImportPart>> "\n" => Statement::Import(args.join("/")),
+
+    /* switch value \n .. => ...\) */
+    <SwitchExpression> => Statement::Expression(Box::new(<>)),
+
+    /* if if-else if-else-if */
+    <IfExpression> => Statement::Expression(Box::new(<>)), 
+
+    /* [a, b, c] = d */
+    "#unpack_tuple" "[" <e:Comma<identifier>> "]" "=" <v:HighLevelExpression> => Statement::UnpackTuple(e, v),
+
+    /* x = 2 */
+    <var:VarPart> "=" <v:HighLevelExpression> => Statement::VarLet(var, v),
+
+    /* var x = 2 */
+    "var" <var:VarPart> "=" <v:HighLevelExpression> => Statement::VarDef(var, v),
+    
+    /* x := 2 */
+    <k:identifier> ":=" <v:HighLevelExpression> => Statement::VarAssign(k, v),
+
+    /* x += y */
+    <l:identifier> "+=" <r:Expr> "\n" => Statement::VarAssign(l.clone(), Box::new(Expr::Op(Box::new(Expr::Identifier(l)), Opcode::Add, r))),
+    
+    /* x -= y */
+    <l:identifier> "-=" <r:Expr> "\n" => Statement::VarAssign(l.clone(), Box::new(Expr::Op(Box::new(Expr::Identifier(l)), Opcode::Sub, r))),
+ 
+    /* x *= y */
+    <l:identifier> "*=" <r:Expr> "\n" => Statement::VarAssign(l.clone(), Box::new(Expr::Op(Box::new(Expr::Identifier(l)), Opcode::Mul, r))), 
+
+    /* x /= y */
+    <l:identifier> "/=" <r:Expr> "\n" => Statement::VarAssign(l.clone(), Box::new(Expr::Op(Box::new(Expr::Identifier(l)), Opcode::Div, r))),
+
+    /* f(a, b, c, ...) => \n .., .., ... */
+    "#function" <name:identifier> "(" <args:Comma<FunctionParam>> ")" "=>" "\n" <stmts:StatementsBlock> =>
+      Statement::FnDef(name, args, stmts),
+
+    /* f(a, b, c, ...) => .., .., ... */
+    "#function" <name:identifier> "(" <args:Comma<FunctionParam>> ")" "=>" <expr:Expr> "\n" =>
+      Statement::FnDef(name, args, vec![Statement::Expression(expr)]),
+
+    /* for x in arr \n StatementsBlock */
+    "for" <var:VarPart> "in" <object:Expr> "\n" <_do:StatementsBlock> => Statement::ForIn(var, object, _do),
+
+    /* for id = expr to expr \n StatementsBlock */
+    "for" <var:VarPart> "=" <start:Expr> "to" <end:Expr> "\n" <_do:StatementsBlock> => Statement::ForTo(var, start, end, _do, None),
+
+    /* for id = expr to expr by expr \n StatementsBlock */
+    "for" <var:VarPart> "=" <start:Expr> "to" <end:Expr> "by" <by:Expr> "\n" <_do:StatementsBlock> => Statement::ForTo(var, start, end, _do, Some(by)),
+
+    /* while expr \n StatementsBlock */
+    "while" <cond:Expr> "\n" <_do:StatementsBlock> => Statement::While(cond, _do),    
+
+    <Expr> StatementEnd => Statement::Expression(<>),
+};
+
+CallArgument: (Option<VarName>, Box<Expr>) = {
+  <k:identifier> "=" <v:Expr> => (Some(k), v),
+  Expr => (None, <>)
+};
+
+FnCallExpression: Box<Expr> = {
+  <i:identifier> "(" <e: Comma<CallArgument>> ")" => Box::new(Expr::FnCall(i, e))
+};
+
+MethodCallExpression: Box<Expr> = {
+  <o:identifier> "." <i:identifier> "(" <e: Comma<CallArgument>> ")" => Box::new(Expr::MethodCall(o, i, e))
+};
+
+PropertyAccessExpression: Box<Expr> = {
+  <o:identifier> "." <p:identifier> => Box::new(Expr::PropertyAccess(o, p))
+};
+
+IndexExpression: Box<Expr> = {
+  <o:identifier> "[" <index:Expr> "]" => Box::new(Expr::Index(o, index))
+};
+
+Term: Box<Expr> = {
+    int => Box::new(Expr::Int(<>)),
+    float => Box::new(Expr::Float(<>)),
+    identifier => Box::new(Expr::Identifier(<>)), 
+    string => Box::new(Expr::String(<>)), 
+    hash_color => Box::new(Expr::HashColor(<>)),
+    "true" => Box::new(Expr::Bool(true)),
+    "false" => Box::new(Expr::Bool(false)),
+
+    <FnCallExpression>,
+    <MethodCallExpression>,  
+    <PropertyAccessExpression>,  
+    <IndexExpression>,  
+
+    "[" <e:Comma<Expr>> "]" => Box::new(Expr::MakeTuple(e)),
+    "(" <Expr> ")"
+};
+
+extern {
+  type Location = Location;
+  type Error = LexicalError;
+
+  enum Tok {
+    Indent => Tok::Indent,
+    Dedent => Tok::Dedent,
+    "+" => Tok::Plus,
+    "-" => Tok::Minus,
+    "/" => Tok::Slash,
+    "*" => Tok::Asterisk,
+    "\\" => Tok::Backslash,
+    "@" => Tok::At,
+    "#" => Tok::Hash,
+    "(" => Tok::OpenParenthesis,
+    ")" => Tok::CloseParenthesis,
+    "[" => Tok::OpenBrackets,
+    "]" => Tok::CloseBrackets,
+    "\n" => Tok::NewLine,
+
+    SOF => Tok::StartOfFile,
+    EOF => Tok::EndOfFile,
+
+    ">" => Tok::Greater,
+    "<" => Tok::Less,
+    ":=" => Tok::Set,
+    "=" => Tok::Equal,
+    "==" => Tok::DoubleEqual,
+    "+=" => Tok::EqualAdd,
+    "-=" => Tok::EqualSub,
+    "/=" => Tok::EqualDiv,
+    "*=" => Tok::EqualMul,
+    "!=" => Tok::NotEqual,
+    "=>" => Tok::Follow,
+    ">=" => Tok::Gte,
+    "<=" => Tok::Lte,
+    ":" => Tok::Colon,
+    "." => Tok::Dot,
+    "," => Tok::Comma,
+    "?" => Tok::QuestionMark,
+    
+    "if" => Tok::If,
+    "else" => Tok::Else,
+    "for" => Tok::For,
+    "to" => Tok::To,
+    "in" => Tok::In,
+    "by" => Tok::By,
+    "while" => Tok::While,
+    "switch" => Tok::Switch,
+    "var" => Tok::Var,
+    "import" => Tok::Import,
+    "not" => Tok::Not,
+    "and" => Tok::And,
+    "or" => Tok::Or,
+    "true" => Tok::True,
+    "false" => Tok::False,
+    "#function" => Tok::FunctionMarker,
+    "#unpack_tuple" => Tok::UnpackTupleMarker,
+
+    int => Tok::Int { value: <i64> },
+    float => Tok::Float { value: <f64> },
+    identifier => Tok::Identifier { name: <String> },
+    string => Tok::String { value: <String> },
+    hash_color => Tok::HashColor(<RGBA>),
+  }
+}
