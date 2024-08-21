@@ -204,7 +204,11 @@ impl Lexer {
 
             // FIXME: bounds
             let t = if is_float {
-                Tok::Float { value: stack.parse::<f64>().unwrap() }
+                if stack.len() == 1 && stack.chars().next().unwrap() == '.' {
+                    Tok::Dot
+                } else {
+                    Tok::Float { value: stack.parse::<f64>().unwrap() }
+                }
             } else {
                 Tok::Int { value: stack.parse::<i64>().unwrap() }
             };
