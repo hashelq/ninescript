@@ -48,6 +48,7 @@ pub enum Tok {
     Switch,
     Import,
     Var,
+    VarIp,
     Const,
     Type,
     Enum,

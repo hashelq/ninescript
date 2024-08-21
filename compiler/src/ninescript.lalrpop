@@ -180,6 +180,9 @@ StatementInner: Statement = {
     /* var x = 2 */
     "#var_decl" "var" <var:VarPart> "=" <v:HighLevelExpression> => Statement::VarDef(var, v),
 
+    /* varip x = 2 */
+    "#var_decl" "varip" <var:VarPart> "=" <v:HighLevelExpression> => Statement::VarIpDef(var, v),
+
     /* const x = 2 */
     "#var_decl" "const" <var:VarPart> "=" <v:HighLevelExpression> => Statement::ConstDef(var, v),
 
@@ -314,6 +317,7 @@ extern {
     "while" => Tok::While,
     "switch" => Tok::Switch,
     "var" => Tok::Var,
+    "varip" => Tok::VarIp,
     "const" => Tok::Const,
     "type" => Tok::Type,
     "enum" => Tok::Enum,

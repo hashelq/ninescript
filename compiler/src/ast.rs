@@ -17,6 +17,7 @@ pub enum Statement {
     SeriesDef(Var, Box<Expr>),
     TypeDef(String, Vec<(String, String)>),
     EnumDef(String, Vec<(String, Option<String>)>),
+    VarIpDef(Var, Box<Expr>),
     VarDef(Var, Box<Expr>),
     VarLet(Var, Box<Expr>),
     VarAssign(VarName, Box<Expr>),

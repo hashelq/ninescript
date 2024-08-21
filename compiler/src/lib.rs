@@ -19,6 +19,7 @@ series a<b> x = 8
 x.y()
 x.y()
 x.y<int>()
+varip int<int> x = 2
 "#.trim_start();
     let tokens = Lexer::new(src, 4).collect::<Vec<_>>();
     let tokens = tokens.into_iter().map(|x| x.unwrap()).collect::<Vec<_>>();

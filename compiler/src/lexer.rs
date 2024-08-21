@@ -90,6 +90,7 @@ impl Lexer {
             "type" => Tok::Type,
             "enum" => Tok::Enum,
             "var" => Tok::Var,
+            "varip" => Tok::VarIp,
             "for" => Tok::For,
             "to" => Tok::To,
             "in" => Tok::In,
