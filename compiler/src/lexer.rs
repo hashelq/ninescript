@@ -18,9 +18,35 @@ pub struct Lexer {
 
 impl Lexer {
     pub fn new(src: &str, indention_level: usize) -> Self {
-        let src = Regex::new(r"^([_a-zA-Z]+[_a-zA-Z0-9]*)(<.*>)?\(.*\) =>").unwrap().replace_all(src, "\0function $0");
-        let src = Regex::new(r"\[([_a-zA-Z]+[_a-zA-Z0-9]*)(,\s*[_a-zA-Z]+[_a-zA-Z0-9]*)*\]\s*=").unwrap().replace_all(&src, "\0unpack_tuple $0");
+        /* Before processing apply some regex barebones, to resolve ambigiousy problems. */
+        // FIXME: IDK, maybe it can be fixed easily with some magic, maybe it
+        // requires a lot of lookaheads.
+        
+        /* Replace tabs with spaces */
         let src = src.replace("\t", &String::from(" ").repeat(indention_level));
+
+        let line_start = r"((?:^||\n)\s*)"; // capture group (usually $1)
+        let ident = "[_a-zA-Z]+[_a-zA-Z0-9]*";
+        let generic_params = ["(?:<", ident, ">)?"].concat();
+        let generic_subject = [ident, &generic_params].concat();
+
+        /* Function definition: ident((Type(<Generic>)?)? name, ...) => statements/expressions */
+        let func_def_rules = [line_start, "(", ident, "\\(.*\\)\\s*=>)"].concat();
+        let src = Regex::new(&func_def_rules).unwrap().replace_all(&src, "$1\0function $2");
+        
+        /* Tuple unpacking [ident, ...] = ident */
+        let tuple_unpack_rules = [line_start, "(\\[(?:", ident , ")(?:,\\s*", ident, ")*\\]\\s*=)"].concat();
+        let src = Regex::new(&tuple_unpack_rules).unwrap().replace_all(&src, "$1\0unpack_tuple $2");
+
+        /* Method calls: a.b<int>(), a.b(), a.b<int, string>() */
+        let method_calls_rules = [ident, "\\.", &generic_subject, "\\(.*\\)"].concat();
+        let src = Regex::new(&method_calls_rules).unwrap().replace_all(&src, "\0method_call $0");
+
+        /* Generic types (for var/fields definitions only) `(var|const)? array<int> x = na`, int x = 3 */
+        let decl_type_specifier = "(?:(?:var|varip|series|const) )?";
+        let var_decl_rules = [line_start, "(", decl_type_specifier, &generic_subject, " ", ident, "\\s*=)"].concat();
+        let src = Regex::new(&var_decl_rules).unwrap().replace_all(&src, "$1\0var_decl $2"); 
+
         let chars = src.chars().collect();
         Self { chars, position: 0, location: Location::new(1, 1), indention_level, new_line: true, indention_now: 0, dedent_required: 0, prev_new_line: true }
     }
@@ -49,6 +75,8 @@ impl Lexer {
         Some(match id {
             "function" => Tok::FunctionMarker,
             "unpack_tuple" => Tok::UnpackTupleMarker,
+            "method_call" => Tok::MethodCallMarker,
+            "var_decl" => Tok::VarDeclarationMarker,
             _ => return None
         })
     }

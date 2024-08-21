@@ -1,13 +1,13 @@
 use crate::types::RGBA;
 
-pub type VarType = Option<String>;
+pub type VarType = (Option<String>, Option<String>);
 pub type VarName = String;
 
 #[derive(Debug)]
 pub struct Var(pub VarType, pub VarName);
 
 #[derive(Debug)]
-pub struct VarParam(pub VarType, pub VarName, pub Option<Box<Expr>>);
+pub struct VarParam(pub Var, pub Option<Box<Expr>>);
 
 #[derive(Debug)]
 pub enum Statement {
@@ -44,8 +44,8 @@ pub enum Expr {
     Not(Box<Expr>),
     Negative(Box<Expr>),
     HashColor(RGBA),
-    FnCall(String, CallArguments),
-    MethodCall(VarName, String, CallArguments),
+    FnCall(String, Option<Vec<String>>, CallArguments),
+    MethodCall(VarName, String, Option<String>, CallArguments),
     PropertyAccess(VarName, String)
 }
 

@@ -56,8 +56,8 @@ CompOp: Opcode = {
 };
 
 Comp2Op: Opcode = {
-    ">" => Opcode::Greater,
     "<" => Opcode::Less,
+    ">" => Opcode::Greater,
     ">=" => Opcode::Gte,
     "<=" => Opcode::Lte,
 };
@@ -85,7 +85,9 @@ BoolLAnd = Tier<BoolAndOp, Comp>;
 Comp = Tier<CompOp, Comp2>;
 Comp2 = Tier<Comp2Op, Additive>;
 Additive = Tier<AdditiveOp, Factor>;
+
 Factor = Tier<FactorOp, Rev>;
+
 Rev: Box<Expr> = {
   "not" <t:Term> => Box::new(Expr::Not(t)),
   "-" <t:Term> => Box::new(Expr::Negative(t)),
@@ -104,12 +106,12 @@ ImportPart: String = {
 };
 
 VarPart: Var = {
-  <t:identifier?> <k:identifier> => Var(t, k)
+  <t:identifier?> <gp:GenericParams?> <k:identifier> => Var((t, gp), k)
 };
 
 FunctionParam: VarParam = {
-  <t:identifier?> <k:identifier> => VarParam(t, k, None),
-  <t:identifier?> <k:identifier> "=" <dv:Expr> => VarParam(t, k, Some(dv)),
+  <t:identifier?> <k:identifier> => VarParam(Var((t, None), k), None),
+  <t:identifier?> <k:identifier> "=" <dv:Expr> => VarParam(Var((t, None), k), Some(dv)),
 };
 
 IfBody: (Box<Expr>, Vec<Statement>) = {
@@ -149,6 +151,10 @@ EnumVariant: (String, Option<String>) = {
   <x:identifier> => (x, None),
 };
 
+GenericParams: String = {
+  "<" <identifier> ">"
+};
+
 StatementInner: Statement = {
     /* import A/B/7 */
     "import" <args:Path<ImportPart>> "\n" => Statement::Import(args.join("/")),
@@ -169,16 +175,16 @@ StatementInner: Statement = {
     "enum" <name:identifier> "\n" Indent <variants:Lines<EnumVariant>> Dedent => Statement::EnumDef(name, variants),
 
     /* x = 2 */
-    <var:VarPart> "=" <v:HighLevelExpression> => Statement::VarLet(var, v),
+    "#var_decl" <var:VarPart>  "=" <v:HighLevelExpression> => Statement::VarLet(var, v),
 
     /* var x = 2 */
-    "var" <var:VarPart> "=" <v:HighLevelExpression> => Statement::VarDef(var, v),
+    "#var_decl" "var" <var:VarPart> "=" <v:HighLevelExpression> => Statement::VarDef(var, v),
 
     /* const x = 2 */
-    "const" <var:VarPart> "=" <v:HighLevelExpression> => Statement::ConstDef(var, v),
+    "#var_decl" "const" <var:VarPart> "=" <v:HighLevelExpression> => Statement::ConstDef(var, v),
 
     /* series x = 2 */
-    "series" <var:VarPart> "=" <v:HighLevelExpression> => Statement::SeriesDef(var, v),
+    "#var_decl" "series" <var:VarPart> "=" <v:HighLevelExpression> => Statement::SeriesDef(var, v),
     
     /* x := 2 */
     <k:identifier> ":=" <v:HighLevelExpression> => Statement::VarAssign(k, v),
@@ -224,11 +230,11 @@ CallArgument: (Option<VarName>, Box<Expr>) = {
 };
 
 FnCallExpression: Box<Expr> = {
-  <i:identifier> "(" <e: Comma<CallArgument>> ")" => Box::new(Expr::FnCall(i, e))
+  <o:identifier> "(" <a:Comma<CallArgument>> ")" => Box::new(Expr::FnCall(o, None, a))
 };
 
 MethodCallExpression: Box<Expr> = {
-  <o:identifier> "." <i:identifier> "(" <e: Comma<CallArgument>> ")" => Box::new(Expr::MethodCall(o, i, e))
+  "#method_call" <o:identifier> "." <i:identifier> <gp:GenericParams?> "(" <e: Comma<CallArgument>> ")" => Box::new(Expr::MethodCall(o, i, gp, e))
 };
 
 PropertyAccessExpression: Box<Expr> = {
@@ -247,9 +253,9 @@ Term: Box<Expr> = {
     hash_color => Box::new(Expr::HashColor(<>)),
     "true" => Box::new(Expr::Bool(true)),
     "false" => Box::new(Expr::Bool(false)),
-
+  
     <FnCallExpression>,
-    <MethodCallExpression>,  
+    <MethodCallExpression>,
     <PropertyAccessExpression>,  
     <IndexExpression>,  
 
@@ -320,6 +326,8 @@ extern {
     "false" => Tok::False,
     "#function" => Tok::FunctionMarker,
     "#unpack_tuple" => Tok::UnpackTupleMarker,
+    "#method_call" => Tok::MethodCallMarker,
+    "#var_decl" => Tok::VarDeclarationMarker,
 
     int => Tok::Int { value: <i64> },
     float => Tok::Float { value: <f64> },

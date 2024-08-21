@@ -57,6 +57,8 @@ pub enum Tok {
 
     FunctionMarker,
     UnpackTupleMarker,
+    MethodCallMarker,
+    VarDeclarationMarker,
 
     /* Math operators */
     Plus,

@@ -13,9 +13,12 @@ lalrpop_mod!(ninescript);
 #[test]
 fn calculator1() {
     let src = r#"
-
-x = x > 2 == x < 3
-
+var array<int> x = na
+array x = na
+series a<b> x = 8
+x.y()
+x.y()
+x.y<int>()
 "#.trim_start();
     let tokens = Lexer::new(src, 4).collect::<Vec<_>>();
     let tokens = tokens.into_iter().map(|x| x.unwrap()).collect::<Vec<_>>();
