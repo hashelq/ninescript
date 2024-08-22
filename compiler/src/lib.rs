@@ -1,6 +1,4 @@
-use lalrpop_util::{lalrpop_mod, ParseError};
-use lexer::Lexer;
-use token::Tok;
+use lalrpop_util::lalrpop_mod;
 
 pub mod ast;
 pub mod lexer;
@@ -8,20 +6,15 @@ pub mod location;
 pub mod error;
 pub mod token;
 pub mod types;
+pub mod processor;
 lalrpop_mod!(ninescript);
 
 #[test]
 fn calculator1() {
     let src = r#"
-var array<int> x = na
-array x = na
-series a<b> x = 8
-x.y()
-x.y()
-x.y<int>()
 varip int<int> x = 2
 "#.trim_start();
-    let tokens = Lexer::new(src, 4).collect::<Vec<_>>();
+    let tokens = lexer::Lexer::new(src, 4).collect::<Vec<_>>();
     let tokens = tokens.into_iter().map(|x| x.unwrap()).collect::<Vec<_>>();
     let result = ninescript::StatementsParser::new().parse(tokens);
     println!("{:?}", result);
